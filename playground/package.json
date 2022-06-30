@@ -6,7 +6,6 @@
     "start": "vite"
   },
   "devDependencies": {
-    "@rollup/plugin-yaml": "^3.0.0",
     "@yfwz100/vite-plugin-vue2": "^1.4.3-2",
     "vite": "^2.1.5"
   },
