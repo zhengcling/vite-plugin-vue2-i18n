@@ -1,19 +1,17 @@
 import { Plugin } from 'vite';
+import YAML from 'js-yaml';
 
 /**
- * The plugin options.
+ * check if is custom block in vue component file
+ * @date 2022-06-30
+ * @param id string
+ * @returns result
  */
-export interface I18nOptions {
-  /**
-   * A function to decide if the given ID should be transformed.
-   * By default, ID with `type=i18n` is consumed.
-   */
-  includes?: (id: string) => boolean;
+function isCustomBlock(id: string) {
+  return /type=i18n/i.test(id);
 }
 
-const defaultOpt: Required<I18nOptions> = {
-  includes: (id: string) => /type=i18n/i.test(id),
-};
+const supportedExtReg = /\.ya?ml$/;
 
 /**
  * Transform the code into assignment.
@@ -28,30 +26,38 @@ function transformCode(varName: string, code: string) {
   if (codeTrimed.startsWith('{')) {
     return `${assignmentPrefix} ${codeTrimed};`;
   } else {
-    return codeTrimed.replace(/export default/, assignmentPrefix);
+    try {
+      const data = YAML.load(codeTrimed);
+      return `${assignmentPrefix} ${JSON.stringify(data)};`;
+    } catch (err) {
+      return codeTrimed.replace(/export default/, assignmentPrefix);
+    }
   }
 }
 
 /**
  * Create the i18n plugin.
  *
- * @param opt the options.
  * @returns the i18n plugin.
  */
-export function createI18nPlugin(options?: I18nOptions): Plugin {
-  const opts = Object.assign({}, defaultOpt, options);
+export function createI18nPlugin(): Plugin {
   return {
     name: 'yfwz100:vite-plugin-vue2-i18n',
-    transform(code: string, id: string) {
-      if (opts.includes(id)) {
+    transform(source: string, id: string) {
+      if (isCustomBlock(id) || supportedExtReg.test(id)) {
+        const value = transformCode('__i18n', source);
+        let code =
+          value +
+          `export default function i18n(Component) {\n` +
+          `  const options = Component.options || Component\n` +
+          `  options.__i18n = options.__i18n || []\n` +
+          `  options.__i18n.push(JSON.stringify(__i18n))\n` +
+          `}`;
+        if (!isCustomBlock(id)) {
+          code = value + `export default __i18n`;
+        }
         return {
-          code:
-            transformCode('__i18n', code.trim()) +
-            `export default function i18n(Component) {\n` +
-            `  const options = Component.options || Component\n` +
-            `  options.__i18n = options.__i18n || []\n` +
-            `  options.__i18n.push(JSON.stringify(__i18n))\n` +
-            `}`,
+          code,
           map: {
             mappings: '',
           },
